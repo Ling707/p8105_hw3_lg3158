@@ -91,3 +91,21 @@ instacart_week = instacart %>%
 kable(instacart_week)
 ```
 
+# problem 2
+
+- data importing and data cleaning
+```{r}
+data("brfss_smart2010") 
+brfss = brfss_smart2010 %>%
+  janitor::clean_names() %>%
+  filter(topic == "Overall Health") %>%
+  rename(state = locationabbr,
+         county = locationdesc) %>%
+  mutate(county = substr(county, 6, 40),
+         response = reorder(response, levels = c("poor", "Fair","Good", "Very Good", "Excellent"))) %>%
+  arrange(response)
+  
+  summary(brfss)
+
+```
+
