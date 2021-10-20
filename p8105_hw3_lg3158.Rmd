@@ -28,6 +28,11 @@ data("instacart")
 skimr::skim(instacart)
 ```
 
+- How many aisles are there, and which aisles are the most items ordered from?
+  - Make a summary table that:
+    - include 3 variables: aisle, items_sold (the total count of the items in the aisle), sell_rank (from the most to the least sell)
+    - the table is arranged by the sell rank in a descending order (from the 1st to the last)
+    - present the top 5 most ordered aisles in the table
 
 ```{r}
 
@@ -45,6 +50,7 @@ kable(instacart_summary[1:5, ], caption = "the top 5 most ordered aisles")
   - The fresh vegetable, fresh fruits, packaged vegetable fruits, yogurt, and packaged cheese are the aisles that most items are ordered from.
   
 - Make a plot that shows the number of items ordered in each aisle, limiting this to aisles with more than 10000 items ordered. Arrange aisles sensibly.
+  - using the summary table above
 
 ```{r echo = TRUE}
 instacart_summary %>%
@@ -58,6 +64,11 @@ instacart_summary %>%
 ```
 
 - Make a table showing the three most popular items in each of the aisles “baking ingredients”, “dog food care”, and “packaged vegetables fruits”. Include the number of times each item is ordered in the table.
+  - The data should:
+    - restrict aisles that sells baking ingredients, dog food care or packaged vegetables fruits
+    - keep 2 variables: product_name and aisle
+    - create new variable called items_sold to summarize the total count of the items
+    - create a new variable called sell_rank to show the most sold items in each aisle, in a descending order
 
 ```{r}
 instacart_3pops = instacart %>%
@@ -73,6 +84,12 @@ kable(instacart_3pops)
 ```
 
 - Make a table showing the mean hour of the day at which Pink Lady Apples and Coffee Ice Cream are ordered on each day of the week.
+  - the table should:
+    - restrict product_name to pink lady apples and coffee ice cream
+    - keep product name, the day of the order, and the time of the order
+    - calculate the mean order time by day and product
+    - apply weekday format to the day of the order, from 0-6 are Sunday to Saturday
+    
 ```{r}
 instacart_week = instacart %>%
   filter(product_name == "Pink Lady Apples" | product_name == "Coffee Ice Cream") %>%
@@ -94,6 +111,11 @@ kable(instacart_week)
 # problem 2
 
 - data importing and data cleaning
+  - change locationabbr into state abbreviation
+  - change locationdesc into county
+  - keep the results of overall health topic
+  - order the response from poor to excellent
+  
 ```{r}
 data("brfss_smart2010") 
 brfss = brfss_smart2010 %>%
@@ -138,9 +160,10 @@ brfss_excellent %>%
 ```
 
 - Make a two-panel plot showing, for the years 2006, and 2010, distribution of data_value for responses (“Poor” to “Excellent”) among locations in NY State.
-  - first data wrangling:
+  - the data for this plot should:
     - the data are restricted state as "NY", and restricted year to 2006 and 2010.
     - the data set contains 3 variables: year, responses (factor variable with 5 ordered levels), data_value.
+    
 ```{r}
 brfss_violin = brfss %>%
   filter((year == 2006 | year == 2010) & state == "NY") %>%
@@ -161,6 +184,7 @@ brfss_violin
   - put `activity.*` into 1 column `time_min`, the original value of `activity.*` will be in a new variable called `activity_count`
   - create new variable `weekday` with 2 levels: "weekday" and "weekend", to show weekday vs. weekend
   - arranged by `day_id` and `time_min`
+  - transform `time_min` to `time_hr` to approximate the real clock time
   
 ```{r}
 acce = read_csv("./data/accel_data.csv",
@@ -171,7 +195,8 @@ acce = read_csv("./data/accel_data.csv",
                values_to = "activity_count") %>%
   mutate(weekday = if_else(day == "Saturday" | day == "Sunday", "weekend", "weekday"),
          day = factor(day, levels = c("Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday")),
-         time_min = as.numeric(time_min)) %>%
+         time_min = as.numeric(time_min),
+         time_hr = time_min/60) %>%
   arrange(day_id, time_min)
 ```
 
@@ -180,6 +205,7 @@ Now there are `r ncol(acce)` variables and `r nrow(acce)` observations in datase
 - make a summary table for total activity variable for each day. The table should be:
   - have 7 columns for each week day, and 5 rows for each week.
   - the total activity variable should be the value
+  
 
 ```{r}
 acce_totalac = acce %>%
@@ -200,23 +226,27 @@ kable(acce_totalac)
 - a single-panel plot that shows the 24-hour activity time courses for each day and use color to indicate day of the week.
   - the data should be modified as:
     - including day, time_min, activity_count
+  - the line plot is hard to distinguish the pattern, so add a `geom_smooth()` to show the pattern
 
 ```{r}
 acce_daychange = acce %>%
-  select(day_id, day, time_min, activity_count) %>%
-  ggplot(aes(x = time_min, y = activity_count, color = day)) +
-    geom_smooth(alpha = 0.4, se = F, size = 1) +
+  select(day_id, day, time_hr, activity_count) %>%
+  group_by(day, day_id) %>%
+  ggplot(aes(x = time_hr, y = activity_count, color = day)) +
+    geom_line(aes(group = day_id),alpha = 0.4, size = 0.5) +
+    geom_smooth(alpha = 0.8, size = 2) +
+    scale_x_continuous(limits = c(0,24), breaks = c(0,4,8,12,16,20,24)) +
     scale_fill_viridis_c() +
     labs(title = "activity over the course of the day",
-         x = "time in a day(min), start from 00:00 to 23:59",
+         x = "time in a day(hr), start from 00:00 to 23:59",
          y = "activity count") +
     theme_minimal()
 acce_daychange
 ```
 
 - From the plot, the patterns are:
-  - The patient's activity is the lowest from 11 pm (time_min around 1400 min) to 3 am (time_min around 180 min) for all the weekdays.
-  - On Monday, the patient is most active during around 10-11 am (time_min around 600-700 min).
+  - The patient's activity is the lowest from 11 pm to 3 am  for all the weekdays.
+  - On Monday, the patient is most active during around 10-11 am.
   - The patient is most active on Friday night.
   - Generally, the patient is least active on Saturday.
 
