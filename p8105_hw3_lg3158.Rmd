@@ -100,12 +100,124 @@ brfss = brfss_smart2010 %>%
   janitor::clean_names() %>%
   filter(topic == "Overall Health") %>%
   rename(state = locationabbr,
-         county = locationdesc) %>%
-  mutate(county = substr(county, 6, 40),
-         response = reorder(response, levels = c("poor", "Fair","Good", "Very Good", "Excellent"))) %>%
+         location = locationdesc) %>%
+  mutate(location = substr(location, 6, 40),
+         response = factor(response, levels = c("Poor", "Fair","Good", "Very good", "Excellent"))) %>%
   arrange(response)
-  
-  summary(brfss)
+```
+
+- In 2002, which states were observed at 7 or more locations? What about in 2010?
+  - make a summary table that count the numbers of locations observed across the states in different years.
+
+```{r}
+brfss_loc = brfss %>%
+  select(state, location, year) %>%
+  filter(year == 2002 | year == 2010) %>%
+  group_by(year, state) %>%
+  summarize(n_loc = n()) %>%
+  filter(n_loc > 7)
+
+kable(brfss_loc)
 
 ```
+From the table above, we can see that 36 states were observed at more than 7 locations in 2002. The 36 states are `r levels(as_factor(pull(subset(brfss_loc, year == 2002), state)))`. 45 states were observed at more than 7 locations in 2010, which are `r levels(as_factor(pull(subset(brfss_loc, year == 2010), state)))`. The number of observed location for each states for each year are shown above.
+
+- make a table that summarizes the mean `data_value` in Excellent responses across year and state.
+
+```{r}
+brfss_excellent = brfss %>%
+  filter(response == "Excellent") %>%
+  select(year, state, data_value) %>%
+  group_by(year,state) %>%
+  summarise(mean_value = mean(data_value, na.rm = T))
+
+brfss_excellent %>%
+  ggplot(aes(x = year, y = mean_value, group = state)) +
+    geom_line(aes(color = state))
+
+```
+
+- Make a two-panel plot showing, for the years 2006, and 2010, distribution of data_value for responses (“Poor” to “Excellent”) among locations in NY State.
+  - first data wrangling:
+    - the data are restricted state as "NY", and restricted year to 2006 and 2010.
+    - the data set contains 3 variables: year, responses (factor variable with 5 ordered levels), data_value.
+```{r}
+brfss_violin = brfss %>%
+  filter((year == 2006 | year == 2010) & state == "NY") %>%
+  select(year,location, response, data_value, confidence_limit_low, confidence_limit_high) %>%
+  arrange(response) %>%
+  ggplot(aes(x = response, y = data_value, fill = response)) +
+    geom_violin() +
+    labs(title = "distribution of `data_value` for responses among locations in NY State in 2006 and 2010",
+         y = "prevalence(%)",
+         x = "general health condition") +
+    facet_wrap(~year)
+brfss_violin  
+```
+
+# problem 3
+
+- load and cleaning data
+  - put `activity.*` into 1 column `time_min`, the original value of `activity.*` will be in a new variable called `activity_count`
+  - create new variable `weekday` with 2 levels: "weekday" and "weekend", to show weekday vs. weekend
+  - arranged by `day_id` and `time_min`
+  
+```{r}
+acce = read_csv("./data/accel_data.csv",
+                col_names = T) %>%
+  pivot_longer(cols = starts_with("activity."),
+               names_to = "time_min",
+               names_prefix = "activity.",
+               values_to = "activity_count") %>%
+  mutate(weekday = if_else(day == "Saturday" | day == "Sunday", "weekend", "weekday"),
+         day = factor(day, levels = c("Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday")),
+         time_min = as.numeric(time_min)) %>%
+  arrange(day_id, time_min)
+```
+
+Now there are `r ncol(acce)` variables and `r nrow(acce)` observations in dataset `acce`. The 6 variables are: `r names(acce)`.  The activity counts ranged from `r min(pull(acce, activity_count))` to `r max(pull(acce, activity_count))` in the 5-week observation.
+
+- make a summary table for total activity variable for each day. The table should be:
+  - have 7 columns for each week day, and 5 rows for each week.
+  - the total activity variable should be the value
+
+```{r}
+acce_totalac = acce %>%
+  select(week, day, day_id, activity_count) %>%
+  group_by(week, day) %>%
+  summarise(total_activity_count = sum(activity_count, na.rm = T)) %>%
+  pivot_wider(names_from = day,
+              values_from = total_activity_count) %>%
+  arrange(week) 
+
+kable(acce_totalac)
+```
+
+- From the table above, the trends are: 
+  - there is a decrease of total activity count in Tuesday and Saturday;
+  - there is an increase of total activity count on Wednesday and Sunday.
+  
+- a single-panel plot that shows the 24-hour activity time courses for each day and use color to indicate day of the week.
+  - the data should be modified as:
+    - including day, time_min, activity_count
+
+```{r}
+acce_daychange = acce %>%
+  select(day_id, day, time_min, activity_count) %>%
+  ggplot(aes(x = time_min, y = activity_count, color = day)) +
+    geom_smooth(alpha = 0.4, se = F, size = 1) +
+    scale_fill_viridis_c() +
+    labs(title = "activity over the course of the day",
+         x = "time in a day(min), start from 00:00 to 23:59",
+         y = "activity count") +
+    theme_minimal()
+acce_daychange
+```
+
+- From the plot, the patterns are:
+  - The patient's activity is the lowest from 11 pm (time_min around 1400 min) to 3 am (time_min around 180 min) for all the weekdays.
+  - On Monday, the patient is most active during around 10-11 am (time_min around 600-700 min).
+  - The patient is most active on Friday night.
+  - Generally, the patient is least active on Saturday.
+
 
